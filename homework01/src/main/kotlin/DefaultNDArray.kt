@@ -76,29 +76,6 @@ interface NDArray: SizeAware, DimentionAware {
     fun dot(other: NDArray): NDArray
 }
 
-fun Point.toIndex(shape: Shape): Int {
-    var index = 0
-    var curSize = 1
-    for (i in ndim - 1 downTo 0) {
-        if (this.dim(i) >= shape.dim(i) || this.dim(i) < 0) {
-            throw NDArrayException.IllegalPointCoordinateException(i, this.dim(i), shape.dim(i))
-        }
-        index += curSize * this.dim(i)
-        curSize *= shape.dim(i)
-    }
-    return index
-}
-
-fun indexToPoint(index: Int, shape: Shape): Point {
-    val coords = IntArray(shape.ndim)
-    var cur = index
-    for (i in shape.ndim - 1 downTo 0) {
-        coords[i] = cur % shape.dim(i)
-        cur /= shape.dim(i)
-    }
-    return DefaultPoint(*coords)
-}
-
 /*
  * Базовая реализация NDArray
  *
@@ -109,16 +86,12 @@ fun indexToPoint(index: Int, shape: Shape): Point {
 class DefaultNDArray private constructor(private val shape: Shape, private val baseArray: IntArray): NDArray {
 
     override fun at(point: Point): Int {
-        if (point.ndim != shape.ndim) {
-            throw NDArrayException.IllegalPointDimensionException(point.ndim, shape.ndim)
-        }
+        point.validate()
         return baseArray[point.toIndex(shape)]
     }
 
     override fun set(point: Point, value: Int) {
-        if (point.ndim != shape.ndim) {
-            throw NDArrayException.IllegalPointDimensionException(point.ndim, shape.ndim)
-        }
+        point.validate()
         baseArray[point.toIndex(shape)] = value
     }
 
@@ -140,7 +113,7 @@ class DefaultNDArray private constructor(private val shape: Shape, private val b
                 baseArray[i] += other.at(indexToPoint(i, shape))
             }
         } else {
-            val otherDims = IntArray(other.ndim) { id -> other.dim(id) }
+            val otherDims = IntArray(other.ndim, other::dim)
             val otherShape = DefaultShape(*otherDims)
             for (i in 0 until other.size) {
                 for (layer in 0 until shape.dim(shape.ndim - 1)) {
@@ -155,16 +128,16 @@ class DefaultNDArray private constructor(private val shape: Shape, private val b
             throw UnsupportedOperationException("Expected 2-dimensional array for a matrix product, found $ndim-dimensional")
         } else if (dim(1) != other.dim(0)) {
             throw UnsupportedOperationException("Matrices must be consistent")
-        } else if (!(other.ndim in 1..2)) {
+        } else if (other.ndim !in 1..2) {
             throw IllegalArgumentException("Expected a 2 or 1, but found ${other.ndim}-dimensional array")
         }
-        val resultDim2 = if (other.ndim == 2) other.dim(1) else 1
-        val result = zeros(DefaultShape(dim(0), resultDim2))
+        val resultSecondDimension = if (other.ndim == 2) other.dim(1) else 1
+        val result = zeros(DefaultShape(dim(0), resultSecondDimension))
         for (i in 0 until dim(0)) {
-            for (j in 0 until resultDim2) {
+            for (j in 0 until resultSecondDimension) {
                 for (k in 0 until dim(1)) {
-                    val point2 = if (other.ndim == 2) DefaultPoint(k, j) else DefaultPoint(k)
-                    result.baseArray[i * resultDim2 + j] += baseArray[i * dim(1) + k] * other.at(point2)
+                    val curOtherPoint = if (other.ndim == 2) DefaultPoint(k, j) else DefaultPoint(k)
+                    result.baseArray[i * resultSecondDimension + j] += baseArray[i * dim(1) + k] * other.at(curOtherPoint)
                 }
             }
         }
@@ -183,11 +156,42 @@ class DefaultNDArray private constructor(private val shape: Shape, private val b
 
     companion object {
 
-        fun zeros(shape: Shape): DefaultNDArray = DefaultNDArray(shape, IntArray(shape.size) {0})
+        private fun createAndFill(shape: Shape, init: (Int) -> Int) =
+            DefaultNDArray(shape, IntArray(shape.size, init))
 
-        fun ones(shape: Shape): DefaultNDArray = DefaultNDArray(shape, IntArray(shape.size) {1})
+        fun zeros(shape: Shape): DefaultNDArray = createAndFill(shape) { 0 }
+
+        fun ones(shape: Shape): DefaultNDArray = createAndFill(shape) { 1 }
     }
 
+    private fun Point.validate() {
+        if (this.ndim != shape.ndim) {
+            throw NDArrayException.IllegalPointDimensionException(this.ndim, shape.ndim)
+        }
+    }
+
+    private fun Point.toIndex(shape: Shape): Int {
+        var index = 0
+        var curSize = 1
+        for (i in ndim - 1 downTo 0) {
+            if (this.dim(i) < 0 || shape.dim(i) <= this.dim(i)) {
+                throw NDArrayException.IllegalPointCoordinateException(i, this.dim(i), shape.dim(i))
+            }
+            index += curSize * this.dim(i)
+            curSize *= shape.dim(i)
+        }
+        return index
+    }
+
+    private fun indexToPoint(index: Int, shape: Shape): Point {
+        val coords = IntArray(shape.ndim)
+        var cur = index
+        for (i in shape.ndim - 1 downTo 0) {
+            coords[i] = cur % shape.dim(i)
+            cur /= shape.dim(i)
+        }
+        return DefaultPoint(*coords)
+    }
 }
 
 sealed class NDArrayException(override val message: String?) : Exception(message) {

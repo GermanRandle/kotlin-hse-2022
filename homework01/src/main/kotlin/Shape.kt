@@ -14,7 +14,7 @@ interface Shape: DimentionAware, SizeAware
  *
  * Сама коллекция параметров недоступна, доступ - через методы интерфейса
  */
-class DefaultShape constructor(private vararg val dimensions: Int): Shape {
+class DefaultShape(private vararg val dimensions: Int): Shape {
 
     init {
         if (dimensions.isEmpty()) {
@@ -40,6 +40,6 @@ sealed class ShapeArgumentException (reason: String = "") : IllegalArgumentExcep
     // NonPositiveDimensionException(val index: Int, val value: Int)
     class EmptyShapeException(): ShapeArgumentException("Cannot create an array with zero dimensions")
     class NonPositiveDimensionException(index: Int, value: Int): ShapeArgumentException(
-        "Dimension $index is $value, but non-positive value expected"
+        "The size of dimension with index $index is $value, but positive value expected"
     )
 }

@@ -81,20 +81,32 @@ sealed class FList<T>: Iterable<T> {
         override val isEmpty = false
 
         override fun <U> fold(base: U, f: (U, T) -> U): U {
-            fun recursiveFold(acc: U, rem: Cons<T>): U {
+            tailrec fun build(acc: U, rem: Cons<T>): U {
                 return if (rem.size == 1) f(acc, rem.head)
-                    else recursiveFold(f(acc, rem.head), rem.tail as Cons<T>)
+                    else build(f(acc, rem.head), rem.tail as Cons<T>)
             }
-            return recursiveFold(base, this)
+
+            return build(base, this)
         }
 
         override fun filter(f: (T) -> Boolean): FList<T> {
-            val tailFiltered = tail.filter(f)
-            return if (f(head)) Cons(head, tailFiltered) else tailFiltered
+            tailrec fun build(current: FList<T>, it: Iterator<T>): FList<T> {
+                if (!it.hasNext()) return current
+                val next = it.next()
+                if (!f(next)) return build(current, it)
+                return build(Cons(next, current), it)
+            }
+
+            return build(nil(), iterator()).reverse()
         }
 
         override fun <U> map(f: (T) -> U): FList<U> {
-            return Cons(f(head), tail.map(f))
+            tailrec fun build(current: FList<U>, it: Iterator<T>): FList<U> {
+                if (!it.hasNext()) return current
+                return build(Cons(f(it.next()), current), it)
+            }
+
+            return build(nil(), iterator()).reverse()
         }
 
         override fun iterator(): Iterator<T> = object : Iterator<T> {
@@ -115,13 +127,13 @@ sealed class FList<T>: Iterable<T> {
     }
 }
 
-private fun <T> arrayToFList(vararg values: T, index: Int = 0): FList<T> {
-    if (index == values.size) return nil()
-    return FList.Cons(values[index], arrayToFList(values = values, index + 1))
-}
-
 // конструирование функционального списка в порядке следования элементов
 // требуемая сложность - O(n)
 fun <T> flistOf(vararg values: T): FList<T> {
-    return arrayToFList(values = values)
+    tailrec fun build(current: FList<T>, index: Int): FList<T> {
+        if (index == -1) return current
+        return build(FList.Cons(values[index], current), index - 1)
+    }
+
+    return build(nil(), values.size - 1)
 }

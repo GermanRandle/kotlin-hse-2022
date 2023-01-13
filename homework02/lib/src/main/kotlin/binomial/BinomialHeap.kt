@@ -28,9 +28,9 @@ class BinomialHeap<T: Comparable<T>> private constructor(private val trees: FLis
         fun <T: Comparable<T>> single(value: T): BinomialHeap<T> = BinomialHeap(flistOf(BinomialTree.single(value)))
     }
 
-    fun <T> FList<T?>.head(): T? = if (this is FList.Cons) head else null
+    private fun <T> FList<T?>.head(): T? = if (this is FList.Cons) head else null
 
-    fun <T> FList<T?>.tail(): FList<T?> = if (this is FList.Cons) tail else flistOf()
+    private fun <T> FList<T?>.tail(): FList<T?> = if (this is FList.Cons) tail else flistOf()
 
     /*
      * слияние куч
@@ -51,11 +51,11 @@ class BinomialHeap<T: Comparable<T>> private constructor(private val trees: FLis
                           carry: BinomialTree<T>? = null): FList<BinomialTree<T>?> {
             if (h1.size == 0 && h2.size == 0 && carry == null) return flistOf()
             val sum = treesSum(h1.head(), h2.head())
-            if (sum.first != null) {
-                return FList.Cons(carry, recursivePlus(h1.tail(), h2.tail(), sum.first))
+            return if (sum.first != null) {
+                FList.Cons(carry, recursivePlus(h1.tail(), h2.tail(), sum.first))
             } else {
                 val sumWithCarry = treesSum(sum.second, carry)
-                return FList.Cons(sumWithCarry.second, recursivePlus(h1.tail(), h2.tail(), sumWithCarry.first))
+                FList.Cons(sumWithCarry.second, recursivePlus(h1.tail(), h2.tail(), sumWithCarry.first))
             }
         }
 
